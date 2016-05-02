@@ -24,11 +24,11 @@ You must be connected to VPN in order to access the Apollo server via SSH.
 
 #### Sample SSH Commands
 
-**Mac OS / Linux**
+###### Mac OS / Linux
 
     $ ssh -p [portnumber] group14@129.120.60.29
     
-**Windows**
+###### Windows
 
 Windows does not have a native SSH client built in. 
 
@@ -37,3 +37,37 @@ Putty is the most popular SSH client for Windows.
 Another option is to install Cmder and Cygwin to emulate a Linux Bash terminal on Windows.
 
 Lastly, you may install the latest Windows 10 Insider Preview to use the new Bash on Ubuntu for Windows client.
+
+#### Program Directory Stucture
+
+- **major-assignment-2/**
+    - **server/**
+        - Makefile
+        - svrMajor2.c
+    - **client/**
+        - Makefile
+        - cliMajor2.c
+    - **docs/**
+        - groups-credentials.xlsx 
+        - major2-instructions-with-samples.pdf
+        - major2-presentation.pptx
+    - **minor7-assignments/** (for reference)
+    - README.md
+
+#### Virtual Machine Directory Structure
+
+###### Server / Client #1
+
+- **~/major-assignment-2/**
+  - **server/**
+    - Makefile
+    - svrMajor2.c
+  - **client11/**
+    - Makefile
+    - cliMajor2.c
+
+###### Client #2
+- **~/major-assignment-2/**
+  - **client2/**
+    - Makefile
+    - cliMajor2.c
