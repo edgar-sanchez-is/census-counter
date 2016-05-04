@@ -15,33 +15,178 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <signal.h>
 
 // Function prototypes
-void error(const char *);
+void error(const char*);
+void sendCensus(int, char*);
+void clientInit(int, char*, char*, int);
+void listenerInit(int, int, int, int);
+void remoteInit(int, char*, int, char*);
+int cpuLoad();
 
 int main(int argc, char *argv[]) {
 	// Checks if user provided necessary arguments
-	if (argc < 3) {
-		fprintf(stderr, "Usage: ./client <rem_ipaddr> <svr_port> <cli1_port> <cli2_port> <cpu_%%>\n");
+	if (argc < 6) {
+		fprintf(stderr, "Usage: ./client<#> <rem_ipaddr> <svr_port> <cli1_port> <cli2_port> <cpu_%%>\n");
 		exit(0);
 	}
 
 	// Declares variables
-	int sockfd, portno;
-	ssize_t n;
-	struct sockaddr_in serv_addr;
-	struct hostent* server;
+	char *serverIP = "192.168.100.217";
+	char *remoteIP = argv[1];
+	int serverPort = atoi(argv[2]);
+	int cpuLimit = atoi(argv[5]);
+
+	ssize_t n = 0;
+
+	// Listener variables
+	int listenerPort = 0;
+	int listenerSocket = 0;
+	int listenerSocketNew = 0;
+
+	// Remote variables
+	int remotePort = 0;
+	int remoteSocket = 0;
+
+	if (strcmp(argv[0], "./client1") == 0) {
+		listenerPort = atoi(argv[3]);
+		remotePort  = atoi(argv[4]);
+	}
+	else if (strcmp(argv[0], "./client2") == 0) {
+		listenerPort = atoi(argv[4]);
+		remotePort  = atoi(argv[3]);
+	}
+
+	// Client variables
 	char buffer[256];
+	int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+	char clientID[2];
+
+	clientInit(serverSocket, clientID, serverIP, serverPort);
+
+	pid_t pid = fork();
+	if (pid < 0) {
+		error("ERROR while forking");
+	}
+	else if (pid == 0) {
+		// Child process
+		listenerInit(listenerSocket, listenerPort, listenerSocketNew, serverSocket);
+		printf("[Client %s] : Enter census data: ", clientID);
+		close(listenerSocket);
+		close(listenerSocketNew);
+		return EXIT_SUCCESS;
+	}
+	else {
+		while (1) {
+			// Prompts user for census data and stores it in a buffer
+			printf("[Client %s] : Enter census data: ", clientID);
+
+			bzero(buffer, 256);
+			fgets(buffer, 255, stdin);
+
+			int cpuCurrent = cpuLoad();
+			if (cpuCurrent > cpuLimit) {
+				printf("==========> [MAX CPU] : CPU Utilization %i%% | CPU Threshold %i%%\n", cpuCurrent, cpuLimit);
+				remoteInit(remoteSocket, remoteIP, remotePort, buffer);
+
+				n = write(serverSocket, "-1", 3);
+				if (n < 0) {
+					error("ERROR writing to socket");
+				}
+
+				break;
+			}
+
+			// Writes census data to server
+			n = write(serverSocket, buffer, strlen(buffer));
+			if (n < 0) {
+				error("ERROR writing to socket");
+			}
+
+			// Reads server reply (should be total) and stores it in a buffer
+			bzero(buffer, 256);
+			n = read(serverSocket, buffer, 255);
+			if (n < 0) {
+				error("ERROR reading from socket");
+			}
+			else if (strncmp(buffer, "CLOSE", 6) == 0) {
+				// Listens for CLOSE confirmation from server then breaks from loop
+				break;
+			}
+			else {
+				// Prints total census count from server
+				printf("==========> [TOTAL] : %s\n", buffer);
+			}
+		}
+	}
+
+	// Loops while user input is a positive integer
+	//wait(NULL);
+	kill(pid, SIGKILL);
+	close(serverSocket);
+	close(listenerSocket);
+	close(listenerSocketNew);
+	close(remoteSocket);
+	printf("[CLIENT %s] Disconnected\n", clientID);
+	return EXIT_SUCCESS;
+}
+
+int cpuLoad() {
+	long double a[4], b[4], loadavg;
+	FILE *fp;
+
+	fp = fopen("/proc/stat","r");
+	fscanf(fp,"%*s %Lf %Lf %Lf %Lf",&a[0],&a[1],&a[2],&a[3]);
+	fclose(fp);
+	sleep(1);
+
+	fp = fopen("/proc/stat","r");
+	fscanf(fp,"%*s %Lf %Lf %Lf %Lf",&b[0],&b[1],&b[2],&b[3]);
+	fclose(fp);
+
+	loadavg = ((b[0]+b[1]+b[2]) - (a[0]+a[1]+a[2])) / ((b[0]+b[1]+b[2]+b[3]) - (a[0]+a[1]+a[2]+a[3]));
+
+	return (int)(loadavg*100);
+}
+
+void sendCensus(int serverSocket, char* buffer) {
+	// Prompts user for census data and stores it in a buffer
+	ssize_t n;
+
+	// Writes census data to server
+	n = write(serverSocket, buffer, strlen(buffer));
+	if (n < 0) {
+		error("ERROR writing to socket");
+	}
+	// Reads server reply (should be total) and stores it in a buffer
+	bzero(buffer, 256);
+	n = read(serverSocket, buffer, 255);
+	if (n < 0) {
+		error("ERROR reading from socket");
+	}
+	else {
+		// Prints total census count from server
+		printf("==========> [TOTAL] : %s\n", buffer);
+	}
+}
+
+void clientInit(int serverSocket, char* clientID, char *serverIP, int serverPort) {
+	printf("SERVER IP: %s\n", serverIP);
+	printf("SERVER PORT: %i\n", serverPort);
+
+	struct sockaddr_in serv_addr;
+	struct hostent* server = NULL;
+	ssize_t n = 0;
 
 	// Initializes socket
-	portno = atoi(argv[2]);
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (sockfd < 0)
+	if (serverSocket < 0)
 		error("ERROR opening socket");
-	server = gethostbyname(argv[1]);
+	server = gethostbyname(serverIP);
 	if (server == NULL) {
 		fprintf(stderr, "ERROR, no such host\n");
 		exit(0);
@@ -49,60 +194,102 @@ int main(int argc, char *argv[]) {
 	bzero((char*) &serv_addr, sizeof(serv_addr));
 	serv_addr.sin_family = AF_INET;
 	bcopy(server->h_addr, (char*) &serv_addr.sin_addr.s_addr, (size_t) server->h_length);
-	serv_addr.sin_port = htons(portno);
-	if (connect(sockfd, (struct sockaddr*) &serv_addr, sizeof(serv_addr)) < 0) {
-		error("ERROR connecting");
+	serv_addr.sin_port = htons(serverPort);
+	if (connect(serverSocket, (struct sockaddr*) &serv_addr, sizeof(serv_addr)) < 0) {
+		error("ERROR connecting to server");
 	}
 
 	// Receives clientID from server
-	char clientID[2];
 	bzero(clientID, 2);
-	n = read(sockfd, clientID, 6);
+	n = read(serverSocket, clientID, 6);
 	if (n < 0) {
 		error("ERROR reading from socket");
 	}
+	printf("SERVER CLIENT ID: %s\n", clientID);
+}
 
-	// Loops while user input is a positive integer
-	while (1) {
-		// Prompts user for census data and stores it in a buffer
-		printf("[Client %s] Enter census data: ", clientID);
-		bzero(buffer, 256);
-		fgets(buffer, 255, stdin);
+void listenerInit(int listenerSocket, int listenerPort, int listenerSocketNew, int serverSocket) {
+	// Declares variables
+	ssize_t n;
+	socklen_t clilen;
+	struct sockaddr_in serv_addr, cli_addr;
+	char buffer[256];
 
-		// Writes census data to server
-		n = write(sockfd, buffer, strlen(buffer));
-		if (n < 0) {
-			error("ERROR writing to socket");
-		}
+	// Opens INET TCP socket
+	listenerSocket = socket(AF_INET, SOCK_STREAM, 0);
+	if (listenerSocket < 0) {
+		error("ERROR opening socket");
+	}
 
-		// Reads server reply and stores it in a buffer
-		bzero(buffer, 256);
-		n = read(sockfd, buffer, 6);
+	// Initializes socket structure
+	bzero((char *) &serv_addr, sizeof(serv_addr));
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_addr.s_addr = INADDR_ANY;
+	serv_addr.sin_port = htons(listenerPort);
+
+	// Binds the host address using bind() function
+	if (bind(listenerSocket, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+		error("ERROR on binding");
+	}
+
+	// Listens for clients and waits for incoming connections
+	listen(listenerSocket,5);
+	clilen = sizeof(cli_addr);
+
+	listenerSocketNew = accept(listenerSocket, (struct sockaddr *) &cli_addr, &clilen);
+	if (listenerSocketNew < 0) {
+		error("ERROR on accept");
+	}
+	printf("Connection accepted from remote client\n");
+	printf("==========> [REMOTE] : Handler assigned\n");
+
+	bzero(buffer, 256);
+	n = read(listenerSocketNew, buffer, 255);
+	if (n < 0) {
+		error("ERROR writing to socket");
+	}
+	int clientCensus = (int) strtoul(buffer, NULL, 0);
+
+	printf("==========> [REMOTE] : Received %u from remote client\n", clientCensus);
+	close(listenerSocketNew);
+	printf("==========> [REMOTE] : Remote client disconnected\n");
+
+	sendCensus(serverSocket, buffer);
+}
+
+void remoteInit(int remoteSocket, char* remoteIP, int remotePort, char* buffer) {
+	struct sockaddr_in serv_addr;
+	struct hostent* server = NULL;
+	remoteSocket = socket(AF_INET, SOCK_STREAM, 0);
+	int clientCensus = (int) strtoul(buffer, NULL, 0);
+	ssize_t n;
+
+	// Initializes socket
+	if (remoteSocket < 0)
+		error("ERROR opening socket");
+	server = gethostbyname(remoteIP);
+	if (server == NULL) {
+		fprintf(stderr, "ERROR, no such host\n");
+		exit(0);
+	}
+	bzero((char*) &serv_addr, sizeof(serv_addr));
+	serv_addr.sin_family = AF_INET;
+	bcopy(server->h_addr, (char*) &serv_addr.sin_addr.s_addr, (size_t) server->h_length);
+	serv_addr.sin_port = htons(remotePort);
+	if (connect(remoteSocket, (struct sockaddr*) &serv_addr, sizeof(serv_addr)) < 0) {
+		//error("ERROR connecting");
+		fprintf(stderr, "Remote client not found\n");
+	}
+	else {
+		printf("==========> [MAX CPU] : Sending %u to remote client\n", clientCensus);
+		n = write(remoteSocket, buffer, strlen(buffer));
 		if (n < 0) {
 			error("ERROR reading from socket");
 		}
-
-		// Processes server reply
-		if (strncmp(buffer, "CPU", 3) == 0) {
-			// TODO: Monitor CPU usage
-			printf("==> [MAX CPU] : CPU Utilization X | CPU Threshold 8%%\n");
-			return EXIT_FAILURE;
-		}
-		else if (strncmp(buffer, "CLOSE", 6) == 0) {
-			// Listens for CLOSE confirmation from server then exits
-			printf("Disconnecting...\n");
-			return EXIT_SUCCESS;
-		}
-		else {
-			// Prints total census count from server
-			printf("==> [TOTAL] : %s\n", buffer);
-		}
 	}
-	close(sockfd);
-	return EXIT_SUCCESS;
 }
 
-void error(const char *msg)
+void error(const char* msg)
 {
 	perror(msg);
 	exit(0);
