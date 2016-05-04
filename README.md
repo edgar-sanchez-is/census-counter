@@ -66,7 +66,7 @@ Place **client** directory on **client 2** and run the `client2` executable.
 
 For example: `./client2 192.168.100.217 51000 52000 53000 13`
 
-![screenshot1](http://i.imgur.com/WuH1Pai.png)
+![screenshot1](http://i.imgur.com/XdgDRR9.png)
 
 #### Program Directory Stucture
 
