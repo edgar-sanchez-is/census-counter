@@ -21,7 +21,7 @@
 #include <sys/mman.h>
 
 // Function prototypes
-void processRequest(int, unsigned int **, size_t);
+void processRequest(int, int **, size_t);
 int error(const char *);
 
 int main(int argc, char *argv[]) {
@@ -43,6 +43,11 @@ int main(int argc, char *argv[]) {
 		error("ERROR opening socket");
 	}
 
+	// Allow socket to be reused immediately
+	int option = 1;
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	setsockopt(sockfd,SOL_SOCKET,(SO_REUSEPORT | SO_REUSEADDR),(char*)&option,sizeof(option));
+
 	// Initializes socket structure
 	bzero((char *) &serv_addr, sizeof(serv_addr));
 	portno = atoi(argv[1]);
@@ -61,7 +66,7 @@ int main(int argc, char *argv[]) {
 	printf("Waiting for incoming connections...\n");
 
 	// Creates base ticket struct then creates a shared memory ticket struct pointing to base
-	unsigned int *totalCensus  = mmap(NULL, sizeof(unsigned int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	int *totalCensus  = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
 	// Client connection loop (allows two connections)
 	size_t clientCounter = 1;
@@ -82,9 +87,9 @@ int main(int argc, char *argv[]) {
 		}
 		else if (pid == 0) {
 			// Child Process
-			printf("[CLIENT %zu] : Handler assigned\n", clientCounter);
 			close(sockfd);
 			processRequest(newsockfd, &totalCensus, clientCounter);
+			close(newsockfd);
 			return EXIT_SUCCESS;
 		}
 		else {
@@ -103,10 +108,10 @@ int main(int argc, char *argv[]) {
 }
 
 // Processes input from client until user disconnects
-void processRequest(int sock, unsigned int **totalCensus, size_t clientID) {
+void processRequest(int sock, int **totalCensus, size_t clientID) {
 	ssize_t n;                                  // Stores read/write return value
 	char buffer[256];                           // Stores buffered input from client
-	unsigned int clientCensus;                  // Stores census data from client
+	int clientCensus;                  // Stores census data from client
 
 	// Sends clientID to client
 	char clientIDBuffer[2];
@@ -115,6 +120,8 @@ void processRequest(int sock, unsigned int **totalCensus, size_t clientID) {
 	if (n < 0) {
 		error("ERROR writing to socket");
 	}
+
+	printf("[CLIENT %zu] : Handler assigned\n", clientID);
 
 	// Loops while client input is a positive integer
 	while (1) {
@@ -126,7 +133,7 @@ void processRequest(int sock, unsigned int **totalCensus, size_t clientID) {
 		}
 
 		// Parses census data string into unsigned int
-		clientCensus = (unsigned int) strtoul(buffer, NULL, 0);
+		clientCensus = (int) strtoul(buffer, NULL, 0);
 
 		// Processes census data from client
 		if (clientCensus > 0) {
@@ -135,20 +142,25 @@ void processRequest(int sock, unsigned int **totalCensus, size_t clientID) {
 			printf("[TOTAL] : %u\n", **totalCensus);
 
 			// Writes census total to client
-			char text[sizeof(totalCensus)];
+			char text[sizeof(int)]; // TODO: Declare outside of loop
 			sprintf(text, "%u", **totalCensus);
 			n = write(sock, text, 6);
 			if (n < 0) {
 				error("ERROR writing to socket");
 			}
 		}
-		else {
+		else if (clientCensus == 0){
 			// Breaks from while loop if client sends 0 or invalid data
 			printf("[CLIENT %zu] : Disconnected\n", clientID);
 			n = write(sock, "CLOSE", 6);
 			if (n < 0) {
 				error("ERROR writing to socket");
 			}
+			break;
+		}
+		else {
+			// Breaks from while loop if client sends 0 or invalid data
+			printf("[CLIENT %zu] : Disconnected due to CPU threshhold\n", clientID);
 			break;
 		}
 	}

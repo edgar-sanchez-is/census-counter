@@ -38,6 +38,36 @@ Another option is to install Cmder and Cygwin to emulate a Linux Bash terminal o
 
 Lastly, you may install the latest Windows 10 Insider Preview to use the new Bash on Ubuntu for Windows client.
 
+#### Program Execution
+
+The following input input may be used to test the server / client program.
+
+###### Server:
+
+Place `server` directory on server.
+
+    ./server <server port>
+    
+For example: `./server 51000`
+
+###### Client 1
+
+Place **client** directory on **client 1** and run the `client1` executable.
+
+    ./client1 <remote client2 IP> <server port> <client1 port> <client2 port> <CPU threshold>
+    
+For example: `./client1 192.168.100.152 51000 52000 53000 13`
+
+###### Client 2
+
+Place **client** directory on **client 2** and run the `client2` executable.
+    
+    ./client2 <remote client2 IP> <server port> <client1 port> <client2 port> <CPU threshold>
+
+For example: `./client2 192.168.100.217 51000 52000 53000 13`
+
+![screenshot1](http://i.imgur.com/WuH1Pai.png)
+
 #### Program Directory Stucture
 
 - **major-assignment-2/**
