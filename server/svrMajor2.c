@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
 			error("ERROR on accept");
 		}
 
-		printf("[CLIENT %zu] : Connection accepted\n", clientCounter);
+		printf("Connection accepted:     Client %zu\n", clientCounter);
 
 		// Forks and processes client requests in child
 		pid = fork();
@@ -120,8 +120,8 @@ void processRequest(int sock, int **totalCensus, size_t clientID) {
 	if (n < 0) {
 		error("ERROR writing to socket");
 	}
+	printf("Handler assigned:        Client %zu\n", clientID);
 
-	printf("[CLIENT %zu] : Handler assigned\n", clientID);
 
 	// Loops while client input is a positive integer
 	while (1) {
@@ -139,7 +139,9 @@ void processRequest(int sock, int **totalCensus, size_t clientID) {
 		if (clientCensus > 0) {
 			// Adds clientCensus to totalCensus then prints total
 			**totalCensus += clientCensus;
-			printf("[TOTAL] : %u\n", **totalCensus);
+			printf("Received from client %zu:  %u\n", clientID, clientCensus);
+			printf("          Census total:  %u\n", **totalCensus);
+
 
 			// Writes census total to client
 			char text[sizeof(int)]; // TODO: Declare outside of loop
@@ -151,7 +153,7 @@ void processRequest(int sock, int **totalCensus, size_t clientID) {
 		}
 		else if (clientCensus == 0){
 			// Breaks from while loop if client sends 0 or invalid data
-			printf("[CLIENT %zu] : Disconnected\n", clientID);
+			printf("Disconnected: Client %zu\n", clientID);
 			n = write(sock, "CLOSE", 6);
 			if (n < 0) {
 				error("ERROR writing to socket");
@@ -160,7 +162,7 @@ void processRequest(int sock, int **totalCensus, size_t clientID) {
 		}
 		else {
 			// Breaks from while loop if client sends 0 or invalid data
-			printf("[CLIENT %zu] : Disconnected due to CPU threshhold\n", clientID);
+			printf("Disconnected due to CPU threshhold: Client %zu\n", clientID);
 			break;
 		}
 	}

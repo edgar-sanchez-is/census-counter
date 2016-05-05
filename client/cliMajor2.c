@@ -22,12 +22,11 @@
 #include <signal.h>
 
 // Function prototypes
-void error(const char*);
-void sendCensus(int, char*);
 void clientInit(int, char*, char*, int);
 void listenerInit(int, int, int, int);
 void remoteInit(int, char*, int, char*);
 int cpuLoad();
+void error(const char*);
 
 int main(int argc, char *argv[]) {
 	// Checks if user provided necessary arguments
@@ -76,7 +75,7 @@ int main(int argc, char *argv[]) {
 	else if (pid == 0) {
 		// Child process
 		listenerInit(listenerSocket, listenerPort, listenerSocketNew, serverSocket);
-		printf("[Client %s] : Enter census data: ", clientID);
+		printf("Enter census data: ");
 		close(listenerSocket);
 		close(listenerSocketNew);
 		return EXIT_SUCCESS;
@@ -84,14 +83,14 @@ int main(int argc, char *argv[]) {
 	else {
 		while (1) {
 			// Prompts user for census data and stores it in a buffer
-			printf("[Client %s] : Enter census data: ", clientID);
+			printf("Enter census data: ");
 
 			bzero(buffer, 256);
 			fgets(buffer, 255, stdin);
 
 			int cpuCurrent = cpuLoad();
 			if (cpuCurrent > cpuLimit) {
-				printf("==========> [MAX CPU] : CPU Utilization %i%% | CPU Threshold %i%%\n", cpuCurrent, cpuLimit);
+				printf("  CPU: Utilization %i%% | Threshold %i%%\n", cpuCurrent, cpuLimit);
 				remoteInit(remoteSocket, remoteIP, remotePort, buffer);
 
 				n = write(serverSocket, "-1", 3);
@@ -107,6 +106,7 @@ int main(int argc, char *argv[]) {
 			if (n < 0) {
 				error("ERROR writing to socket");
 			}
+			printf("Sent to server:    %s", buffer);
 
 			// Reads server reply (should be total) and stores it in a buffer
 			bzero(buffer, 256);
@@ -120,7 +120,7 @@ int main(int argc, char *argv[]) {
 			}
 			else {
 				// Prints total census count from server
-				printf("==========> [TOTAL] : %s\n", buffer);
+				printf("  Census total:    %s\n", buffer);
 			}
 		}
 	}
@@ -132,52 +132,13 @@ int main(int argc, char *argv[]) {
 	close(listenerSocket);
 	close(listenerSocketNew);
 	close(remoteSocket);
-	printf("[CLIENT %s] Disconnected\n", clientID);
+	printf("Disconnected from server\n", clientID);
 	return EXIT_SUCCESS;
 }
 
-int cpuLoad() {
-	long double a[4], b[4], loadavg;
-	FILE *fp;
-
-	fp = fopen("/proc/stat","r");
-	fscanf(fp,"%*s %Lf %Lf %Lf %Lf",&a[0],&a[1],&a[2],&a[3]);
-	fclose(fp);
-	sleep(1);
-
-	fp = fopen("/proc/stat","r");
-	fscanf(fp,"%*s %Lf %Lf %Lf %Lf",&b[0],&b[1],&b[2],&b[3]);
-	fclose(fp);
-
-	loadavg = ((b[0]+b[1]+b[2]) - (a[0]+a[1]+a[2])) / ((b[0]+b[1]+b[2]+b[3]) - (a[0]+a[1]+a[2]+a[3]));
-
-	return (int)(loadavg*100);
-}
-
-void sendCensus(int serverSocket, char* buffer) {
-	// Prompts user for census data and stores it in a buffer
-	ssize_t n;
-
-	// Writes census data to server
-	n = write(serverSocket, buffer, strlen(buffer));
-	if (n < 0) {
-		error("ERROR writing to socket");
-	}
-	// Reads server reply (should be total) and stores it in a buffer
-	bzero(buffer, 256);
-	n = read(serverSocket, buffer, 255);
-	if (n < 0) {
-		error("ERROR reading from socket");
-	}
-	else {
-		// Prints total census count from server
-		printf("==========> [TOTAL] : %s\n", buffer);
-	}
-}
-
 void clientInit(int serverSocket, char* clientID, char *serverIP, int serverPort) {
-	printf("SERVER IP: %s\n", serverIP);
-	printf("SERVER PORT: %i\n", serverPort);
+	printf("SERVER IP:    %s\n", serverIP);
+	printf("SERVER PORT:  %i\n", serverPort);
 
 	struct sockaddr_in serv_addr;
 	struct hostent* server = NULL;
@@ -205,7 +166,8 @@ void clientInit(int serverSocket, char* clientID, char *serverIP, int serverPort
 	if (n < 0) {
 		error("ERROR reading from socket");
 	}
-	printf("SERVER CLIENT ID: %s\n", clientID);
+
+	printf("CLIENT ID:    %s\n\n", clientID);
 }
 
 void listenerInit(int listenerSocket, int listenerPort, int listenerSocketNew, int serverSocket) {
@@ -240,8 +202,8 @@ void listenerInit(int listenerSocket, int listenerPort, int listenerSocketNew, i
 	if (listenerSocketNew < 0) {
 		error("ERROR on accept");
 	}
-	printf("Connection accepted from remote client\n");
-	printf("==========> [REMOTE] : Handler assigned\n");
+	printf("Connection accepted:  Remote client\n");
+	printf("Handler assigned:     Remote client\n");
 
 	bzero(buffer, 256);
 	n = read(listenerSocketNew, buffer, 255);
@@ -250,11 +212,25 @@ void listenerInit(int listenerSocket, int listenerPort, int listenerSocketNew, i
 	}
 	int clientCensus = (int) strtoul(buffer, NULL, 0);
 
-	printf("==========> [REMOTE] : Received %u from remote client\n", clientCensus);
+	printf("Received %u from remote client\n", clientCensus);
 	close(listenerSocketNew);
-	printf("==========> [REMOTE] : Remote client disconnected\n");
+	printf("Disconnected:         Remote Client\n");
 
-	sendCensus(serverSocket, buffer);
+	// Writes census data to server
+	n = write(serverSocket, buffer, strlen(buffer));
+	if (n < 0) {
+		error("ERROR writing to socket");
+	}
+	// Reads server reply (should be total) and stores it in a buffer
+	bzero(buffer, 256);
+	n = read(serverSocket, buffer, 255);
+	if (n < 0) {
+		error("ERROR reading from socket");
+	}
+	else {
+		// Prints total census count from server
+		printf("  Census total:    %s\n", buffer);
+	}
 }
 
 void remoteInit(int remoteSocket, char* remoteIP, int remotePort, char* buffer) {
@@ -278,15 +254,33 @@ void remoteInit(int remoteSocket, char* remoteIP, int remotePort, char* buffer) 
 	serv_addr.sin_port = htons(remotePort);
 	if (connect(remoteSocket, (struct sockaddr*) &serv_addr, sizeof(serv_addr)) < 0) {
 		//error("ERROR connecting");
-		fprintf(stderr, "Remote client not found\n");
+		fprintf(stderr, "Remote client is offline, census data not sent\n");
 	}
 	else {
-		printf("==========> [MAX CPU] : Sending %u to remote client\n", clientCensus);
+		printf("MAX CPU : Sending %u to remote client\n", clientCensus);
 		n = write(remoteSocket, buffer, strlen(buffer));
 		if (n < 0) {
 			error("ERROR reading from socket");
 		}
 	}
+}
+
+int cpuLoad() {
+	long double a[4], b[4], loadavg;
+	FILE *fp;
+
+	fp = fopen("/proc/stat","r");
+	fscanf(fp,"%*s %Lf %Lf %Lf %Lf",&a[0],&a[1],&a[2],&a[3]);
+	fclose(fp);
+	sleep(1);
+
+	fp = fopen("/proc/stat","r");
+	fscanf(fp,"%*s %Lf %Lf %Lf %Lf",&b[0],&b[1],&b[2],&b[3]);
+	fclose(fp);
+
+	loadavg = ((b[0]+b[1]+b[2]) - (a[0]+a[1]+a[2])) / ((b[0]+b[1]+b[2]+b[3]) - (a[0]+a[1]+a[2]+a[3]));
+
+	return (int)(loadavg*100);
 }
 
 void error(const char* msg)
