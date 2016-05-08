@@ -1,4 +1,4 @@
-# Major Aassignment 2
+# Ticketing System
 ###### Sockets &amp; Synchronization
 ###### Team: Alex, Edgar, Luis, Russell
 --------
