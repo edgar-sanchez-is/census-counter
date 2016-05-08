@@ -1,6 +1,5 @@
 # Ticketing System
 ###### Sockets &amp; Synchronization
-###### Team: Alex, Edgar, Luis, Russell
 --------
 
 #### UNT VPN Client
