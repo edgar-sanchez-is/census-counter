@@ -1,4 +1,4 @@
-# Ticketing System
+# Census Counter
 ###### Sockets &amp; Synchronization
 --------
 
@@ -41,7 +41,7 @@ For example: `./client2 192.168.100.217 51000 52000 53000 13`
 
 #### Program Directory Stucture
 
-- **ticketing-system/**
+- **census-counter/**
     - **server/**
         - Makefile
         - svrMajor2.c
@@ -52,11 +52,11 @@ For example: `./client2 192.168.100.217 51000 52000 53000 13`
         - major2-instructions-with-samples.pdf
     - README.md
 
-#### Virtual Machine Directory Structure
+#### Host Directory Structure
 
 ###### Server / Client #1
 
-- **~/ticketing-system/**
+- **~/census-counter/**
   - **server/**
     - Makefile
     - svrMajor2.c
@@ -65,7 +65,7 @@ For example: `./client2 192.168.100.217 51000 52000 53000 13`
     - cliMajor2.c
 
 ###### Client #2
-- **~/ticketing-system/**
+- **~/census-counter/**
   - **client2/**
     - Makefile
     - cliMajor2.c
