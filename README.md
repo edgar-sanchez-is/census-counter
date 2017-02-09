@@ -1,5 +1,5 @@
 # Census Counter
-###### Sockets &amp; Synchronization
+###### Command line based census counter consisting of a client/server model using Linux network sockets
 --------
 
 #### Host Information
